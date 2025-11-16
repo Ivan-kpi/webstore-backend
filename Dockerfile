@@ -5,27 +5,32 @@ FROM ruby:$RUBY_VERSION-slim AS base
 
 WORKDIR /app
 
+# Install system dependencies for Rails + PostgreSQL + Psych
 RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y \
     build-essential \
     libpq-dev \
-    postgresql-client \
-    curl && \
+    libyaml-dev \
+    git \
+    curl \
+    postgresql-client && \
     rm -rf /var/lib/apt/lists/*
 
-ENV RAILS_ENV=production
-ENV RACK_ENV=production
-ENV BUNDLE_PATH=/usr/local/bundle
+# Install Bundler to match Gemfile.lock
+RUN gem install bundler -v 2.7.2
 
+# Copy Gemfiles first to install gems
 COPY Gemfile Gemfile.lock ./
 
-RUN gem install bundler -v 2.7.2
-RUN bundle _2.7.2_ install --without development test
+RUN bundle install --jobs 4 --retry 3
 
+# Copy the rest of the app
 COPY . .
 
-RUN bundle exec rails assets:precompile
-
+# Expose port Railway will use
 EXPOSE 3000
 
+# Run the Rails server
 CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0", "-p", "3000"]
+
+
