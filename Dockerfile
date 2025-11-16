@@ -1,78 +1,54 @@
 # syntax=docker/dockerfile:1
-# check=error=true
 
-# This Dockerfile is designed for production, not development. Use with Kamal or build'n'run by hand:
-# docker build -t webstore_backend .
-# docker run -d -p 80:80 -e RAILS_MASTER_KEY=<value from config/master.key> --name webstore_backend webstore_backend
+ARG RUBY_VERSION=3.4.1
+FROM ruby:$RUBY_VERSION-slim AS base
 
-# For a containerized dev environment, see Dev Containers: https://guides.rubyonrails.org/getting_started_with_devcontainer.html
+WORKDIR /app
 
-# Make sure RUBY_VERSION matches the Ruby version in .ruby-version
-ARG RUBY_VERSION=3.4.7
-FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
-
-# Rails app lives here
-WORKDIR /rails
-
-# Install base packages
+# ----- System deps -----
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y curl libjemalloc2 libvips postgresql-client && \
-    ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so && \
-    rm -rf /var/lib/apt/lists /var/cache/apt/archives
+    apt-get install --no-install-recommends -y \
+    build-essential \
+    libpq-dev \
+    postgresql-client \
+    libvips \
+    git && \
+    rm -rf /var/lib/apt/lists/*
 
-# Set production environment variables and enable jemalloc for reduced memory usage and latency.
-ENV RAILS_ENV="production" \
-    BUNDLE_DEPLOYMENT="1" \
-    BUNDLE_PATH="/usr/local/bundle" \
-    BUNDLE_WITHOUT="development" \
-    LD_PRELOAD="/usr/local/lib/libjemalloc.so"
+ENV RAILS_ENV=production \
+    BUNDLE_WITHOUT="development:test" \
+    BUNDLE_PATH=/bundle
 
-# Throw-away build stage to reduce size of final image
-FROM base AS build
+# ----- Install gems -----
+COPY Gemfile Gemfile.lock ./
+RUN gem install bundler && bundle install --jobs 4 --retry 3
 
-# Install packages needed to build gems
-RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y build-essential git libpq-dev libyaml-dev pkg-config && \
-    rm -rf /var/lib/apt/lists /var/cache/apt/archives
-
-# Install application gems
-COPY Gemfile Gemfile.lock vendor ./
-
-RUN bundle install && \
-    rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git && \
-    # -j 1 disable parallel compilation to avoid a QEMU bug: https://github.com/rails/bootsnap/issues/495
-    bundle exec bootsnap precompile -j 1 --gemfile
-
-# Copy application code
+# ----- Copy app -----
 COPY . .
 
-# Precompile bootsnap code for faster boot times.
-# -j 1 disable parallel compilation to avoid a QEMU bug: https://github.com/rails/bootsnap/issues/495
-RUN bundle exec bootsnap precompile -j 1 app/ lib/
+# Precompile bootsnap
+RUN bundle exec bootsnap precompile --gemfile app/ lib/
 
-# Adjust binfiles to be executable on Linux
-RUN chmod +x bin/* && \
-    sed -i "s/\r$//g" bin/* && \
-    sed -i 's/ruby\.exe$/ruby/' bin/*
+# ----- Assets precompile (if needed) -----
+# RUN bundle exec rails assets:precompile
 
+# ----- Final Stage -----
+FROM ruby:$RUBY_VERSION-slim AS final
 
+WORKDIR /app
 
+# Install runtime-only deps
+RUN apt-get update && apt-get install -y \
+    libpq5 libvips && \
+    rm -rf /var/lib/apt/lists/*
 
-# Final stage for app image
-FROM base
+ENV RAILS_ENV=production \
+    RAILS_LOG_TO_STDOUT=true \
+    BUNDLE_PATH=/bundle
 
-# Run and own only the runtime files as a non-root user for security
-RUN groupadd --system --gid 1000 rails && \
-    useradd rails --uid 1000 --gid 1000 --create-home --shell /bin/bash
-USER 1000:1000
+COPY --from=base /bundle /bundle
+COPY --from=base /app /app
 
-# Copy built artifacts: gems, application
-COPY --chown=rails:rails --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
-COPY --chown=rails:rails --from=build /rails /rails
+EXPOSE 3000
 
-# Entrypoint prepares the database.
-ENTRYPOINT ["/rails/bin/docker-entrypoint"]
-
-# Start server via Thruster by default, this can be overwritten at runtime
-EXPOSE 80
-CMD ["./bin/thrust", "./bin/rails", "server"]
+CMD ["bash", "-lc", "rails server -b 0.0.0.0 -p ${PORT:-3000}"]
