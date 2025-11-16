@@ -1,25 +1,30 @@
-FROM ruby:3.2.9
+# syntax=docker/dockerfile:1
+
+ARG RUBY_VERSION=3.2.9
+FROM ruby:$RUBY_VERSION-slim AS base
 
 WORKDIR /app
 
-# Install system dependencies
 RUN apt-get update -qq && \
-    apt-get install -y build-essential libpq-dev nodejs postgresql-client
+    apt-get install --no-install-recommends -y \
+    build-essential \
+    libpq-dev \
+    postgresql-client \
+    curl && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install gems
+ENV RAILS_ENV=production
+ENV RACK_ENV=production
+ENV BUNDLE_PATH=/usr/local/bundle
+
 COPY Gemfile Gemfile.lock ./
-RUN bundle install
 
-# Copy the app
+RUN gem install bundler -v 2.7.2
+RUN bundle _2.7.2_ install --without development test
+
 COPY . .
 
-# Railway needs a PORT ENV
-ENV RAILS_ENV=production
-ENV RAILS_LOG_TO_STDOUT=true
-ENV PORT=3000
-
-# Precompile assets (if any)
-RUN bundle exec rails assets:precompile || true
+RUN bundle exec rails assets:precompile
 
 EXPOSE 3000
 
