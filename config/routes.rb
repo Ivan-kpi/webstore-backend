@@ -16,22 +16,22 @@ Rails.application.routes.draw do
     }
 
   devise_scope :user do
-    post   "api/users/sign_in",  to: "users/sessions#create"
-    delete "api/users/sign_out", to: "users/sessions#destroy"
+    post   "users/sign_in",  to: "users/sessions#create"
+    delete "users/sign_out", to: "users/sessions#destroy"
 
-    post   "api/users",          to: "users/registrations#create"
+    post   "users",          to: "users/registrations#create"
   end
 
   #
   # === API NAMESPACE ===
   #
-  namespace :api do
-    get "/me", to: "me#show"
+  
+  get "/me", to: "me#show"
 
-    resources :items
-    resources :orders, only: [:index, :show, :create]
-    resources :users
-  end
+  resources :items
+  resources :orders, only: [:index, :show, :create]
+  resources :users
+
 end
 
 
