@@ -13,3 +13,5 @@ test:
   <<: *default
   database: webstore_backend_test
 
+production:
+  url: <%= ENV["DATABASE_URL"] %>
