@@ -1,23 +1,31 @@
-source "https://rubygems.org"
+# syntax=docker/dockerfile:1
 
-ruby "3.2.9"
+ARG RUBY_VERSION=3.2.9
+FROM ruby:$RUBY_VERSION-slim AS base
 
-gem "rails", "~> 8.1.1"
-gem "pg", "~> 1.1"
-gem "puma", ">= 5.0"
+WORKDIR /app
 
-gem "devise"
-gem "devise-jwt"
-gem "rack-cors"
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y \
+    build-essential \
+    libpq-dev \
+    postgresql-client \
+    curl && \
+    rm -rf /var/lib/apt/lists/*
 
-gem "image_processing", "~> 1.2"
+ENV RAILS_ENV=production
+ENV RACK_ENV=production
+ENV BUNDLE_PATH=/usr/local/bundle
 
-# Windows fix
-gem "tzinfo-data", platforms: [:windows]
+COPY Gemfile Gemfile.lock ./
 
-gem "bootsnap", "~> 1.18", require: false
+RUN bundle install --without development test
 
-group :development, :test do
-  gem "debug", platforms: [:mri, :windows], require: "debug/prelude"
-end
+COPY . .
+
+RUN bundle exec rails assets:precompile
+
+EXPOSE 3000
+
+CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0", "-p", "3000"]
 
