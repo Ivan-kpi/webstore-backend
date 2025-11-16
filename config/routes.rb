@@ -1,33 +1,31 @@
 Rails.application.routes.draw do
   #
-  # === CORS FIX: allow OPTIONS preflight ===
+  # === CORS FIX: allow OPTIONS preflight for ALL endpoints ===
   #
   match "*path", to: "application#cors_preflight", via: [:options]
 
   #
-  # === API & AUTH ROUTES ===
+  # === DEVlSE (JSON + JWT, old URL format) ===
   #
-  namespace :api, defaults: { format: :json } do
-    #
-    # === Devise (JWT) Routes ===
-    #
-    devise_for :users,
-      skip: :all,
-      controllers: {
-        sessions: "users/sessions",
-        registrations: "users/registrations"
-      }
+  devise_for :users,
+    defaults: { format: :json },
+    skip: :all,
+    controllers: {
+      sessions: "users/sessions",
+      registrations: "users/registrations"
+    }
 
-    devise_scope :user do
-      post   "login",    to: "users/sessions#create"
-      delete "logout",   to: "users/sessions#destroy"
+  devise_scope :user do
+    post   "api/users/sign_in",  to: "users/sessions#create"
+    delete "api/users/sign_out", to: "users/sessions#destroy"
 
-      post   "register", to: "users/registrations#create"
-    end
+    post   "api/users",          to: "users/registrations#create"
+  end
 
-    #
-    # === Other API Endpoints ===
-    #
+  #
+  # === API NAMESPACE ===
+  #
+  namespace :api do
     get "/me", to: "me#show"
 
     resources :items
@@ -35,4 +33,5 @@ Rails.application.routes.draw do
     resources :users
   end
 end
+
 
