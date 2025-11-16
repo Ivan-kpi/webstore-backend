@@ -8,6 +8,20 @@ Bundler.require(*Rails.groups)
 
 module WebstoreBackend
   class Application < Rails::Application
+
+    config.middleware.insert_before 0, Rack::Cors do
+      allow do
+        origins 'https://webstore-frontend-production.up.railway.app', 'http://localhost:5173'
+
+        resource '*',
+          headers: :any,
+          expose: ['Authorization'],
+          methods: [:get, :post, :put, :patch, :delete, :options, :head]
+      end
+    end
+
+    config.hosts.clear
+    
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.1
 

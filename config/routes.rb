@@ -1,31 +1,38 @@
 Rails.application.routes.draw do
   #
-  # === CASTOM JSON ROUTES FOR DEVISE + JWT ===
+  # === CORS FIX: allow OPTIONS preflight ===
   #
-  devise_for :users,
-    defaults: { format: :json },
-    skip: :all,  # IMPORTANT !!
-    controllers: {
-      sessions: "users/sessions",
-      registrations: "users/registrations"
-    }
-
-  # Manual JSON routes for API authentication
-  devise_scope :user do
-    post   "users/sign_in",  to: "users/sessions#create"
-    delete "users/sign_out", to: "users/sessions#destroy"
-
-    post   "users",          to: "users/registrations#create"
-  end
-
+  match "*path", to: "application#cors_preflight", via: [:options]
 
   #
-  # === API NAMESPACE ===
+  # === API & AUTH ROUTES ===
   #
-  namespace :api do
+  namespace :api, defaults: { format: :json } do
+    #
+    # === Devise (JWT) Routes ===
+    #
+    devise_for :users,
+      skip: :all,
+      controllers: {
+        sessions: "users/sessions",
+        registrations: "users/registrations"
+      }
+
+    devise_scope :user do
+      post   "login",    to: "users/sessions#create"
+      delete "logout",   to: "users/sessions#destroy"
+
+      post   "register", to: "users/registrations#create"
+    end
+
+    #
+    # === Other API Endpoints ===
+    #
     get "/me", to: "me#show"
+
     resources :items
     resources :orders, only: [:index, :show, :create]
     resources :users
   end
 end
+
