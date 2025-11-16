@@ -1,0 +1,15 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  username: postgres
+  password: 13066031Vv*
+  host: localhost
+
+development:
+  <<: *default
+  database: webstore_backend_development
+
+test:
+  <<: *default
+  database: webstore_backend_test
+
