@@ -15,6 +15,8 @@ gem "image_processing", "~> 1.2"
 # Windows fix
 gem "tzinfo-data", platforms: [:windows]
 
+gem "bootsnap", "~> 1.18", require: false
+
 group :development, :test do
   gem "debug", platforms: [:mri, :windows], require: "debug/prelude"
 end
